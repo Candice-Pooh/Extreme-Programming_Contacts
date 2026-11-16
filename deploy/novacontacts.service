@@ -1,0 +1,20 @@
+[Unit]
+Description=NovaContacts address book
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/novacontacts
+Environment=CONTACTS_DB=/var/lib/novacontacts/contacts.db
+ExecStart=/opt/novacontacts/.venv/bin/gunicorn --workers 1 --threads 4 --bind 127.0.0.1:5050 --access-logfile - app:create_app()
+Restart=on-failure
+UMask=0027
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/novacontacts
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

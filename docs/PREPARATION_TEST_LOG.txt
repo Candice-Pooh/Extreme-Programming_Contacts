@@ -1,0 +1,24 @@
+test_bad_file (test_app.AddressBookTests.test_bad_file) ... ok
+test_bad_json_and_origin (test_app.AddressBookTests.test_bad_json_and_origin) ... ok
+test_crud_and_multiple_methods (test_app.AddressBookTests.test_crud_and_multiple_methods) ... ok
+test_delete_cascade (test_app.AddressBookTests.test_delete_cascade) ... ok
+test_duplicate_policy_append (test_app.AddressBookTests.test_duplicate_policy_append) ... ok
+test_favorite_persists_across_app_restart (test_app.AddressBookTests.test_favorite_persists_across_app_restart) ... ok
+test_formula_rejected_and_export_literal (test_app.AddressBookTests.test_formula_rejected_and_export_literal) ... ok
+test_import_atomicity (test_app.AddressBookTests.test_import_atomicity) ... ok
+test_invalid_headers (test_app.AddressBookTests.test_invalid_headers) ... ok
+test_not_found (test_app.AddressBookTests.test_not_found) ... ok
+test_page_and_health (test_app.AddressBookTests.test_page_and_health) ... ok
+test_search_details_and_case (test_app.AddressBookTests.test_search_details_and_case) ... ok
+test_template (test_app.AddressBookTests.test_template) ... ok
+test_upload_limit (test_app.AddressBookTests.test_upload_limit) ... ok
+test_validation (test_app.AddressBookTests.test_validation) ... /tmp/novacontacts-venv/lib/python3.12/site-packages/werkzeug/routing/rules.py:770: ResourceWarning: unclosed file <_io.FileIO name=3 mode='rb+' closefd=True>
+  _convert(elem) if is_dynamic else ast.Constant(elem)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+ok
+test_xlsx_round_trip (test_app.AddressBookTests.test_xlsx_round_trip) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 0.189s
+
+OK
