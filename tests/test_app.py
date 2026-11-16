@@ -58,7 +58,20 @@ class AddressBookTests(unittest.TestCase):
         self.assertTrue(result.json['favorite'])
         other = create_app({'TESTING': True, 'DATABASE': self.path}).test_client()
         self.assertTrue(other.get('/api/contacts?favorite=1').json['contacts'][0]['favorite'])
+    
+    def test_favorite_filter_returns_only_favorites(self):
+        normal = dict(self.contact, name='Normal Example', favorite=False)
+        favorite = dict(self.contact, name='Favorite Example', favorite=True)
 
+        self.add(normal)
+        self.add(favorite)
+
+        response = self.client.get('/api/contacts?favorite=1')
+
+        self.assertEqual(response.status_code, 200)
+        names = [item['name'] for item in response.json['contacts']]
+        self.assertEqual(names, ['Favorite Example'])
+  
     def test_search_details_and_case(self):
         self.add()
         self.assertEqual(len(self.client.get('/api/contacts?q=LIN@EXAMPLE').json['contacts']), 1)
