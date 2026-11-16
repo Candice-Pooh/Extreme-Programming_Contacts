@@ -1,135 +1,220 @@
 'use strict';
+
 const $ = (id) => document.getElementById(id);
 let contacts = [];
 let favoritesOnly = false;
 let editingId = null;
+let messageTimer = null;
 
-function element(tag, className, text) {
+function element(tag, className = '', text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
 }
+
 function message(text, error = false) {
-  $('message').textContent = text;
-  $('message').classList.toggle('error', error);
+  const target = $('message');
+  target.textContent = text;
+  target.classList.toggle('error', error);
+  target.classList.add('visible');
+  if (messageTimer) window.clearTimeout(messageTimer);
+  messageTimer = window.setTimeout(() => {
+    target.classList.remove('visible');
+    target.textContent = '';
+  }, 4200);
 }
+
 async function api(path, method = 'GET', body) {
-  const options = { method };
+  const options = { method, headers: {} };
   if (body !== undefined) {
-    options.headers = { 'Content-Type': 'application/json' };
+    options.headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(body);
   }
   const response = await fetch(path, options);
   if (response.status === 204) return null;
-  const data = await response.json();
+
+  let data;
+  try {
+    data = await response.json();
+  } catch (_error) {
+    throw new Error('The server returned an unreadable response.');
+  }
   if (!response.ok) throw new Error(data.error || 'Request failed.');
   return data;
 }
+
 async function refresh() {
-  contacts = (await api('/api/contacts')).contacts;
+  const data = await api('/api/contacts');
+  contacts = Array.isArray(data.contacts) ? data.contacts : [];
   render();
 }
-function render() {
-  const query = $('search').value.trim().toLocaleLowerCase();
-  const shown = contacts.filter((c) => (!favoritesOnly || c.favorite)
-    && [c.name, c.company, c.notes, ...c.methods.map((m) => m.value)].join(' ').toLocaleLowerCase().includes(query));
-  $('allCount').textContent = contacts.length;
-  $('favCount').textContent = contacts.filter((c) => c.favorite).length;
-  $('resultCount').textContent = shown.length + (shown.length === 1 ? ' CONNECTION' : ' CONNECTIONS');
-  $('contacts').replaceChildren();
-  $('empty').hidden = shown.length > 0;
-  for (const c of shown) {
-    const card = element('article', 'card');
-    const head = element('div', 'card-head');
-    const initials = c.name.split(/\s+/).map((s) => Array.from(s)[0]).slice(0, 2).join('').toUpperCase();
-    head.append(element('div', 'avatar', initials));
-    const person = element('div', 'person');
-    person.append(element('h2', '', c.name), element('p', '', c.company || 'Independent connection'));
-    const star = element('button', 'star' + (c.favorite ? ' selected' : ''), c.favorite ? '★' : '☆');
-    star.setAttribute('aria-label', (c.favorite ? 'Unfavorite ' : 'Favorite ') + c.name);
-    star.setAttribute('aria-pressed', String(c.favorite));
-    star.onclick = () => action(star, async () => {
-      await api('/api/contacts/' + c.id + '/favorite', 'PATCH', { favorite: !c.favorite });
-      await refresh();
-    });
-    head.append(person, star);
-    card.append(head);
-    
-for (const m of c.methods) {
-  const row = element('div', 'detail');
 
-  const kind = element('span', 'kind', m.kind);
-  let valueNode;
+function getInitials(name) {
+  return name.trim().split(/\s+/).map((part) => Array.from(part)[0] || '').slice(0, 2).join('').toUpperCase();
+}
 
-  // Phone: click to call
-  if (m.kind === 'phone') {
-    valueNode = element('a', 'detail-value detail-link', m.value);
-    const dialValue = m.value.replace(/[^\d+*#,;]/g, '');
-    valueNode.href = 'tel:' + dialValue;
-    valueNode.setAttribute('aria-label', 'Call ' + m.value);
+function getMethodIcon(kind) {
+  return ({ phone: '☎', email: '✉', social: '@', address: '⌖' })[kind] || '•';
+}
+
+function getMethodLabel(kind) {
+  return ({ phone: 'PHONE', email: 'EMAIL', social: 'SOCIAL', address: 'ADDRESS' })[kind] || String(kind).toUpperCase();
+}
+
+function createMethodValue(method) {
+  if (method.kind === 'phone') {
+    const link = element('a', 'detail-value detail-link', method.value);
+    const dialValue = method.value.replace(/[^\d+*#,;]/g, '');
+    link.href = 'tel:' + dialValue;
+    link.setAttribute('aria-label', 'Call ' + method.value);
+    return link;
   }
-
-  // Email: click to send email
-  else if (m.kind === 'email') {
-    valueNode = element('a', 'detail-value detail-link', m.value);
-    valueNode.href = 'mailto:' + m.value.trim();
-    valueNode.setAttribute('aria-label', 'Email ' + m.value);
+  if (method.kind === 'email') {
+    const link = element('a', 'detail-value detail-link', method.value);
+    link.href = 'mailto:' + method.value.trim();
+    link.setAttribute('aria-label', 'Email ' + method.value);
+    return link;
   }
+  return element('span', 'detail-value', method.value);
+}
 
-  // Other contact methods: display as text
-  else {
-    valueNode = element('span', 'detail-value', m.value);
+async function copyText(value) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
   }
+  const temporary = element('textarea', 'clipboard-fallback');
+  temporary.value = value;
+  temporary.setAttribute('readonly', '');
+  document.body.append(temporary);
+  temporary.select();
+  const copied = document.execCommand('copy');
+  temporary.remove();
+  if (!copied) throw new Error('Clipboard access is unavailable in this browser.');
+}
 
-  // Copy button for every contact method
-  const copy = element('button', 'copy-method', 'Copy');
-  copy.type = 'button';
-  copy.setAttribute('aria-label', 'Copy ' + m.kind + ' for ' + c.name);
+function createContactCard(contact) {
+  const card = element('article', 'card');
+  const head = element('div', 'card-head');
+  const avatar = element('div', 'avatar', getInitials(contact.name));
+  avatar.setAttribute('aria-hidden', 'true');
 
-  copy.onclick = () => action(copy, async () => {
-    if (!navigator.clipboard?.writeText) {
-      throw new Error('Clipboard access is unavailable.');
-    }
+  const person = element('div', 'person');
+  person.append(
+    element('h2', '', contact.name),
+    element('p', '', contact.company || 'Independent connection')
+  );
 
-    await navigator.clipboard.writeText(m.value);
-    message(m.kind[0].toUpperCase() + m.kind.slice(1) + ' copied.');
+  const star = element('button', 'star' + (contact.favorite ? ' selected' : ''), contact.favorite ? '★' : '☆');
+  star.type = 'button';
+  star.setAttribute('aria-label', (contact.favorite ? 'Remove ' : 'Add ') + contact.name + (contact.favorite ? ' from favorites' : ' to favorites'));
+  star.setAttribute('aria-pressed', String(contact.favorite));
+  star.title = contact.favorite ? 'Remove from favorites' : 'Add to favorites';
+  star.onclick = () => action(star, async () => {
+    await api('/api/contacts/' + contact.id + '/favorite', 'PATCH', { favorite: !contact.favorite });
+    await refresh();
+    message(contact.favorite ? 'Removed from favorites.' : 'Added to favorites.');
   });
 
-  row.append(kind, valueNode, copy);
-  card.append(row);
+  head.append(avatar, person, star);
+  card.append(head);
+
+  if (contact.methods && contact.methods.length) {
+    for (const method of contact.methods) {
+      const row = element('div', 'detail');
+      const icon = element('span', 'method-icon', getMethodIcon(method.kind));
+      icon.setAttribute('aria-hidden', 'true');
+      const kind = element('span', 'kind', getMethodLabel(method.kind));
+      const value = createMethodValue(method);
+      const copy = element('button', 'copy-method', 'Copy');
+      copy.type = 'button';
+      copy.setAttribute('aria-label', 'Copy ' + method.kind + ' for ' + contact.name);
+      copy.onclick = () => action(copy, async () => {
+        await copyText(method.value);
+        message(getMethodLabel(method.kind) + ' copied.');
+      });
+      row.append(icon, kind, value, copy);
+      card.append(row);
+    }
+  } else {
+    card.append(element('p', 'hint no-methods', 'No contact methods yet.'));
+  }
+
+  if (contact.notes) card.append(element('p', 'notes', contact.notes));
+
+  const actions = element('div', 'card-actions');
+  const edit = element('button', 'edit-action', 'Edit contact');
+  edit.type = 'button';
+  edit.onclick = () => openEditor(contact);
+
+  const remove = element('button', 'delete', 'Delete');
+  remove.type = 'button';
+  remove.onclick = () => {
+    if (window.confirm('Delete ' + contact.name + '? This cannot be undone.')) {
+      action(remove, async () => {
+        await api('/api/contacts/' + contact.id, 'DELETE');
+        await refresh();
+        message('Contact deleted.');
+      });
+    }
+  };
+  actions.append(edit, remove);
+  card.append(actions);
+  return card;
 }
 
-    if (!c.methods.length) card.append(element('p', 'hint', 'No contact methods yet.'));
-    if (c.notes) card.append(element('p', 'notes', c.notes));
-    const actions = element('div', 'card-actions');
-    const edit = element('button', '', 'Edit contact');
-    edit.onclick = () => openEditor(c);
-    const remove = element('button', 'delete', 'Delete');
-    remove.onclick = () => {
-      if (confirm('Delete ' + c.name + '? This cannot be undone.')) {
-        action(remove, async () => {
-          await api('/api/contacts/' + c.id, 'DELETE');
-          await refresh();
-          message('Contact deleted.');
-        });
-      }
-    };
-    actions.append(edit, remove);
-    card.append(actions);
-    $('contacts').append(card);
+function render() {
+  const query = $('search').value.trim().toLocaleLowerCase();
+  const shown = contacts.filter((contact) => {
+    const matchesFavorite = !favoritesOnly || contact.favorite;
+    const searchable = [contact.name, contact.company, contact.notes, ...(contact.methods || []).map((method) => method.value)]
+      .join(' ').toLocaleLowerCase();
+    return matchesFavorite && searchable.includes(query);
+  });
+
+  $('allCount').textContent = contacts.length;
+  $('favCount').textContent = contacts.filter((contact) => contact.favorite).length;
+  $('resultCount').textContent = shown.length + (shown.length === 1 ? ' CONNECTION' : ' CONNECTIONS');
+  $('sectionHint').textContent = favoritesOnly ? 'People you marked as important' : 'Organized for you';
+  $('clearSearch').hidden = !query;
+  $('contacts').replaceChildren(...shown.map(createContactCard));
+  $('empty').hidden = shown.length > 0;
+
+  if (shown.length === 0) {
+    const hasContacts = contacts.length > 0;
+    $('emptyTitle').textContent = query
+      ? 'No matching connections.'
+      : favoritesOnly && hasContacts
+        ? 'No favorites yet.'
+        : 'Your next connection starts here.';
+    $('emptyDescription').textContent = query
+      ? 'Try another name, company, or contact detail.'
+      : favoritesOnly && hasContacts
+        ? 'Mark a contact with the star to keep them close.'
+        : 'Add your first contact, or download and import the Excel template.';
+    $('emptyAdd').hidden = query.length > 0;
+    $('emptyClearSearch').hidden = query.length === 0;
   }
 }
+
 async function action(button, task) {
   button.disabled = true;
-  try { await task(); } catch (error) { message(error.message, true); }
-  finally { button.disabled = false; }
+  try {
+    await task();
+  } catch (error) {
+    message(error.message || 'Something went wrong.', true);
+  } finally {
+    button.disabled = false;
+  }
 }
+
 function addMethod(kind = 'phone', value = '') {
   if ($('methods').children.length >= 40) {
     $('formError').textContent = 'Maximum 40 contact methods.';
     return;
   }
+  $('formError').textContent = '';
   const row = element('div', 'method-row');
   const select = element('select');
   select.setAttribute('aria-label', 'Method type');
@@ -139,19 +224,27 @@ function addMethod(kind = 'phone', value = '') {
     select.append(option);
   }
   select.value = kind;
+
   const input = element('input');
+  input.type = 'text';
   input.value = value;
   input.required = true;
   input.maxLength = 300;
   input.setAttribute('aria-label', 'Method value');
-  input.placeholder = 'Contact details';
-  const remove = element('button', '', '✕');
+  input.placeholder = 'Enter contact details';
+
+  const remove = element('button', 'remove-method', '×');
   remove.type = 'button';
   remove.setAttribute('aria-label', 'Remove method');
-  remove.onclick = () => row.remove();
+  remove.title = 'Remove this contact method';
+  remove.onclick = () => {
+    row.remove();
+    $('formError').textContent = '';
+  };
   row.append(select, input, remove);
   $('methods').append(row);
 }
+
 function openEditor(contact = null) {
   editingId = contact?.id ?? null;
   $('contactForm').reset();
@@ -162,50 +255,99 @@ function openEditor(contact = null) {
   $('favorite').checked = contact?.favorite || false;
   $('formError').textContent = '';
   $('methods').replaceChildren();
-  if (contact) contact.methods.forEach((m) => addMethod(m.kind, m.value));
-  else addMethod();
+  if (contact && contact.methods.length) {
+    contact.methods.forEach((method) => addMethod(method.kind, method.value));
+  } else {
+    addMethod();
+  }
   $('editor').showModal();
+  $('name').focus();
 }
+
+function closeEditor() {
+  $('editor').close();
+  editingId = null;
+}
+
 $('newContact').onclick = () => openEditor();
 $('emptyAdd').onclick = () => openEditor();
 $('addMethod').onclick = () => addMethod();
-for (const id of ['closeEditor', 'cancelEditor']) $(id).onclick = () => $('editor').close();
+for (const id of ['closeEditor', 'cancelEditor']) $(id).onclick = closeEditor;
+$('editor').addEventListener('click', (event) => {
+  if (event.target === $('editor')) closeEditor();
+});
 $('contactForm').onsubmit = async (event) => {
   event.preventDefault();
   const button = $('saveContact');
   button.disabled = true;
+  $('formError').textContent = '';
   const data = {
-    name: $('name').value, company: $('company').value, notes: $('notes').value,
+    name: $('name').value.trim(),
+    company: $('company').value.trim(),
+    notes: $('notes').value.trim(),
     favorite: $('favorite').checked,
     methods: [...$('methods').children].map((row) => ({
-      kind: row.querySelector('select').value, value: row.querySelector('input').value
+      kind: row.querySelector('select').value,
+      value: row.querySelector('input').value.trim()
     }))
   };
+  const wasEditing = editingId !== null;
   try {
     await api('/api/contacts' + (editingId === null ? '' : '/' + editingId),
       editingId === null ? 'POST' : 'PUT', data);
-    $('editor').close();
+    closeEditor();
     await refresh();
-    message('Contact saved.');
-  } catch (error) { $('formError').textContent = error.message; }
-  finally { button.disabled = false; }
+    message(wasEditing ? 'Contact updated.' : 'Contact saved.');
+  } catch (error) {
+    $('formError').textContent = error.message || 'Unable to save contact.';
+  } finally {
+    button.disabled = false;
+  }
 };
+
 function switchTab(favorite) {
   favoritesOnly = favorite;
   $('allTab').classList.toggle('active', !favorite);
   $('favTab').classList.toggle('active', favorite);
+  $('allTab').removeAttribute('aria-current');
+  $('favTab').removeAttribute('aria-current');
+  (favorite ? $('favTab') : $('allTab')).setAttribute('aria-current', 'page');
   $('pageTitle').textContent = favorite ? 'Your favorites.' : 'All contacts.';
   render();
 }
+
 $('allTab').onclick = () => switchTab(false);
 $('favTab').onclick = () => switchTab(true);
 $('search').oninput = render;
+$('clearSearch').onclick = () => {
+  $('search').value = '';
+  render();
+  $('search').focus();
+};
+$('emptyClearSearch').onclick = () => {
+  $('search').value = '';
+  render();
+  $('search').focus();
+};
+
 $('importButton').onclick = () => {
-  if (confirm('Import adds new contacts and keeps existing ones. Reimporting the same file adds duplicates. Continue?')) $('importFile').click();
+  if (window.confirm('Import adds new contacts and keeps existing ones. Reimporting the same file adds duplicates. Continue?')) {
+    $('importFile').click();
+  }
 };
 $('importFile').onchange = async () => {
   const file = $('importFile').files[0];
   if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.xlsx')) {
+    message('Please choose an .xlsx file.', true);
+    $('importFile').value = '';
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    message('The file must be 2 MB or smaller.', true);
+    $('importFile').value = '';
+    return;
+  }
   await action($('importButton'), async () => {
     const body = new FormData();
     body.append('file', file);
@@ -217,4 +359,5 @@ $('importFile').onchange = async () => {
   });
   $('importFile').value = '';
 };
+
 refresh().catch((error) => message('Cannot load contacts: ' + error.message, true));
