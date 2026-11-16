@@ -203,3 +203,31 @@ h1 { margin: 9px 0 5px; font-size: clamp(36px, 4vw, 52px); line-height: 1.12; le
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Final contact detail readability refinement */
+
+.detail {
+    gap: 6px;
+}
+
+.kind {
+    flex-basis: 50px;
+}
+
+.copy-method {
+    padding: 4px 8px;
+    font-size: 9px;
+}
+
+/* Keep email addresses on one line on desktop */
+.detail-link[href^="mailto:"] {
+    font-size: 11px;
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+    .detail-link[href^="mailto:"] {
+        font-size: 10px;
+    }
+}
