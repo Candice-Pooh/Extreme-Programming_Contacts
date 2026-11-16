@@ -1,14 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>NovaContacts — People, connected.</title><link rel="stylesheet" href="/static/style.css"><script src="/static/app.js" defer></script></head>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8f3">
+  <meta name="description" content="NovaContacts — a thoughtful home for every connection.">
+  <title>NovaContacts — People, connected.</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
 <body>
-<aside class="sidebar"><a class="brand" href="/">N<span>NovaContacts<small>YOUR PEOPLE, TOGETHER</small></span></a><div class="workspace">WORKSPACE</div><button class="nav active" id="allTab">All contacts <span id="allCount">0</span></button><button class="nav" id="favTab">★ Favorites <span id="favCount">0</span></button><div class="sidebar-bottom"><span class="status-dot"></span> SQLite · persistent storage<br><small>A little closer. A lot more organized.</small></div></aside>
-<main><header><div><div class="eyebrow">THE PEOPLE THAT MATTER</div><h1 id="pageTitle">All contacts.</h1><p>A thoughtful home for every connection.</p></div><button class="primary" id="newContact">＋ New contact</button></header>
-<section class="demo-notice">Shared course demo · Use fictional contact details only. Everyone with this link can edit this shared address book.</section>
-<section class="toolbar" aria-label="Contact tools"><input type="search" id="search" placeholder="Search names, companies, or contact details…" aria-label="Search contacts"><div class="tools"><a href="/api/template" class="button">↓ Template</a><button id="importButton">↑ Import Excel</button><a href="/api/export" class="button">↓ Export Excel</a><input id="importFile" type="file" accept=".xlsx" hidden></div></section>
-<div class="section-label"><span id="resultCount">0 CONNECTIONS</span><span>Organized for you</span></div>
-<div id="message" role="status" aria-live="polite"></div><section id="contacts" class="grid" aria-label="Contacts"></section>
-<section id="empty" class="empty" hidden><div class="empty-icon">＋</div><h2>Your next connection starts here.</h2><p>Add your first contact, or download and import the Excel template.</p><button id="emptyAdd" class="primary">Add a contact</button></section>
-<footer>NovaContacts <span>Extreme Programming · 2026</span></footer></main>
-<dialog id="editor"><form id="contactForm"><div class="modal-head"><div><div class="eyebrow">MAKE A CONNECTION</div><h2 id="editorTitle">New contact</h2></div><button type="button" id="closeEditor" aria-label="Close editor">✕</button></div><label>Name <span class="required">*</span><input id="name" required maxlength="100" autocomplete="name"></label><label>Company<input id="company" maxlength="100" autocomplete="organization" placeholder="Where they make things happen"></label><div class="methods-heading"><strong>Contact methods</strong><button type="button" id="addMethod">＋ Add method</button></div><div id="methods"></div><p class="hint">Add multiple phone numbers, emails, social accounts, or addresses.</p><label>Notes<textarea id="notes" maxlength="1000" rows="3" placeholder="The little details worth remembering"></textarea></label><label class="checkbox"><input type="checkbox" id="favorite"> Add to favorites</label><div id="formError" role="alert"></div><div class="modal-actions"><button type="button" id="cancelEditor">Cancel</button><button class="primary" type="submit" id="saveContact">Save contact</button></div></form></dialog>
-</body></html>
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="NovaContacts home">
+      <span class="brand-mark" aria-hidden="true">N</span>
+      <span class="brand-copy">NovaContacts<small>YOUR PEOPLE, TOGETHER</small></span>
+    </a>
+
+    <div class="workspace">WORKSPACE</div>
+    <nav class="navigation" aria-label="Contact views">
+      <button class="nav active" id="allTab" type="button" aria-current="page">
+        <span class="nav-icon" aria-hidden="true">▦</span>
+        <span class="nav-label">All contacts</span>
+        <span class="nav-count" id="allCount">0</span>
+      </button>
+      <button class="nav" id="favTab" type="button">
+        <span class="nav-icon favorite-nav-icon" aria-hidden="true">★</span>
+        <span class="nav-label">Favorites</span>
+        <span class="nav-count" id="favCount">0</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span>SQLite · persistent storage</span>
+      <small>A little closer. A lot more organized.</small>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="page-header">
+      <div class="page-heading">
+        <div class="eyebrow">THE PEOPLE THAT MATTER</div>
+        <h1 id="pageTitle">All contacts.</h1>
+        <p>A thoughtful home for every connection.</p>
+      </div>
+      <div class="header-actions">
+        <button class="primary new-contact-button" id="newContact" type="button">
+          <span aria-hidden="true">＋</span> New contact
+        </button>
+      </div>
+    </header>
+
+    <section class="demo-notice" aria-label="Demo notice">
+      <span class="notice-icon" aria-hidden="true">ⓘ</span>
+      <span>Shared course demo · Use fictional contact details only. Everyone with this link can edit this shared address book.</span>
+    </section>
+
+    <section class="toolbar" aria-label="Contact tools">
+      <div class="search-wrap">
+        <span class="search-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="search" placeholder="Search names, companies, or contact details…" aria-label="Search contacts">
+        <button class="clear-search" id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
+      </div>
+      <div class="tools">
+        <a href="/api/template" class="button tool-button" download>
+          <span aria-hidden="true">↓</span> Template
+        </a>
+        <button id="importButton" class="tool-button" type="button">
+          <span aria-hidden="true">↑</span> Import Excel
+        </button>
+        <a href="/api/export" class="button tool-button" download>
+          <span aria-hidden="true">↓</span> Export Excel
+        </a>
+        <input id="importFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+      </div>
+    </section>
+
+    <div class="section-label">
+      <span id="resultCount">0 CONNECTIONS</span>
+      <span id="sectionHint">Organized for you</span>
+    </div>
+
+    <div id="message" class="message" role="status" aria-live="polite"></div>
+    <section id="contacts" class="grid" aria-label="Contacts"></section>
+
+    <section id="empty" class="empty" hidden>
+      <div class="empty-icon" aria-hidden="true">＋</div>
+      <h2 id="emptyTitle">Your next connection starts here.</h2>
+      <p id="emptyDescription">Add your first contact, or download and import the Excel template.</p>
+      <div class="empty-actions">
+        <button id="emptyAdd" class="primary" type="button">Add a contact</button>
+        <button id="emptyClearSearch" class="secondary-button" type="button" hidden>Clear search</button>
+      </div>
+    </section>
+
+    <footer class="page-footer">
+      <span>NovaContacts</span>
+      <span>Extreme Programming · 2026</span>
+    </footer>
+  </main>
+
+  <dialog id="editor" class="editor-dialog" aria-labelledby="editorTitle">
+    <form id="contactForm">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">MAKE A CONNECTION</div>
+          <h2 id="editorTitle">New contact</h2>
+          <p class="modal-subtitle">Keep the details that help you stay connected.</p>
+        </div>
+        <button type="button" id="closeEditor" class="icon-button" aria-label="Close editor">×</button>
+      </div>
+
+      <div class="form-section-title">BASIC INFORMATION</div>
+      <label class="form-field">Name <span class="required">*</span>
+        <input id="name" required maxlength="100" autocomplete="name" placeholder="e.g. Alex Chen">
+      </label>
+      <label class="form-field">Company
+        <input id="company" maxlength="100" autocomplete="organization" placeholder="Where they make things happen">
+      </label>
+
+      <div class="methods-heading">
+        <div>
+          <strong>Contact methods</strong>
+          <p>Add more than one phone, email, social account, or address.</p>
+        </div>
+        <button type="button" id="addMethod" class="add-method-button">＋ Add method</button>
+      </div>
+      <div id="methods" class="methods-list"></div>
+
+      <label class="form-field">Notes
+        <textarea id="notes" maxlength="1000" rows="3" placeholder="The little details worth remembering"></textarea>
+      </label>
+      <label class="checkbox-field">
+        <input type="checkbox" id="favorite">
+        <span class="custom-check" aria-hidden="true"></span>
+        <span>Add to favorites</span>
+      </label>
+      <div id="formError" class="form-error" role="alert" aria-live="polite"></div>
+      <div class="modal-actions">
+        <button type="button" id="cancelEditor" class="secondary-button">Cancel</button>
+        <button class="primary" type="submit" id="saveContact">Save contact</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>
