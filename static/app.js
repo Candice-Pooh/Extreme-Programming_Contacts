@@ -55,11 +55,51 @@ function render() {
     });
     head.append(person, star);
     card.append(head);
-    for (const m of c.methods) {
-      const row = element('div', 'detail');
-      row.append(element('span', 'kind', m.kind), element('span', 'detail-value', m.value));
-      card.append(row);
+    
+for (const m of c.methods) {
+  const row = element('div', 'detail');
+
+  const kind = element('span', 'kind', m.kind);
+  let valueNode;
+
+  // Phone: click to call
+  if (m.kind === 'phone') {
+    valueNode = element('a', 'detail-value detail-link', m.value);
+    const dialValue = m.value.replace(/[^\d+*#,;]/g, '');
+    valueNode.href = 'tel:' + dialValue;
+    valueNode.setAttribute('aria-label', 'Call ' + m.value);
+  }
+
+  // Email: click to send email
+  else if (m.kind === 'email') {
+    valueNode = element('a', 'detail-value detail-link', m.value);
+    valueNode.href = 'mailto:' + m.value.trim();
+    valueNode.setAttribute('aria-label', 'Email ' + m.value);
+  }
+
+  // Other contact methods: display as text
+  else {
+    valueNode = element('span', 'detail-value', m.value);
+  }
+
+  // Copy button for every contact method
+  const copy = element('button', 'copy-method', 'Copy');
+  copy.type = 'button';
+  copy.setAttribute('aria-label', 'Copy ' + m.kind + ' for ' + c.name);
+
+  copy.onclick = () => action(copy, async () => {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error('Clipboard access is unavailable.');
     }
+
+    await navigator.clipboard.writeText(m.value);
+    message(m.kind[0].toUpperCase() + m.kind.slice(1) + ' copied.');
+  });
+
+  row.append(kind, valueNode, copy);
+  card.append(row);
+}
+
     if (!c.methods.length) card.append(element('p', 'hint', 'No contact methods yet.'));
     if (c.notes) card.append(element('p', 'notes', c.notes));
     const actions = element('div', 'card-actions');
