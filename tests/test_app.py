@@ -158,12 +158,22 @@ class AddressBookTests(unittest.TestCase):
     def test_upload_limit(self):
         self.assertEqual(self.upload(io.BytesIO(b'x' * (2 * 1024 * 1024))).status_code, 413)
 
+    
     def test_delete_cascade(self):
         item = self.add().json
         self.client.delete(f"/api/contacts/{item['id']}")
+
         import sqlite3
-        with sqlite3.connect(self.path) as db:
-            self.assertEqual(db.execute('SELECT COUNT(*) FROM methods').fetchone()[0], 0)
+
+        connection = sqlite3.connect(self.path)
+        try:
+            count = connection.execute(
+                'SELECT COUNT(*) FROM methods'
+            ).fetchone()[0]
+        finally:
+            connection.close()
+
+        self.assertEqual(count, 0)
 
 
 if __name__ == '__main__':
