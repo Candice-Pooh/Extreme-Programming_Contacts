@@ -58,7 +58,20 @@ class AddressBookTests(unittest.TestCase):
         self.assertTrue(result.json['favorite'])
         other = create_app({'TESTING': True, 'DATABASE': self.path}).test_client()
         self.assertTrue(other.get('/api/contacts?favorite=1').json['contacts'][0]['favorite'])
+    
+    def test_favorite_filter_returns_only_favorites(self):
+        normal = dict(self.contact, name='Normal Example', favorite=False)
+        favorite = dict(self.contact, name='Favorite Example', favorite=True)
 
+        self.add(normal)
+        self.add(favorite)
+
+        response = self.client.get('/api/contacts?favorite=1')
+
+        self.assertEqual(response.status_code, 200)
+        names = [item['name'] for item in response.json['contacts']]
+        self.assertEqual(names, ['Favorite Example'])
+  
     def test_search_details_and_case(self):
         self.add()
         self.assertEqual(len(self.client.get('/api/contacts?q=LIN@EXAMPLE').json['contacts']), 1)
@@ -145,12 +158,22 @@ class AddressBookTests(unittest.TestCase):
     def test_upload_limit(self):
         self.assertEqual(self.upload(io.BytesIO(b'x' * (2 * 1024 * 1024))).status_code, 413)
 
+    
     def test_delete_cascade(self):
         item = self.add().json
         self.client.delete(f"/api/contacts/{item['id']}")
+
         import sqlite3
-        with sqlite3.connect(self.path) as db:
-            self.assertEqual(db.execute('SELECT COUNT(*) FROM methods').fetchone()[0], 0)
+
+        connection = sqlite3.connect(self.path)
+        try:
+            count = connection.execute(
+                'SELECT COUNT(*) FROM methods'
+            ).fetchone()[0]
+        finally:
+            connection.close()
+
+        self.assertEqual(count, 0)
 
 
 if __name__ == '__main__':
